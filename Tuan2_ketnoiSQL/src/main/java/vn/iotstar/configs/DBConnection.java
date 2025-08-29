@@ -4,7 +4,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 
 public class DBConnection {
-    private final String serverName = "localhost";  // hoặc LAPTOP-U031V8FN\NGOCTAI
+    private final String serverName = "LAPTOP-U031V8FN\\NGOCTAI";  // hoặc LAPTOP-U031V8FN\NGOCTAI
     private final String dbName = "ltwb";           // tên database bạn đã tạo
     private final String portNumber = "1433";
     private final String instance = "";   

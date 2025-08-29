@@ -38,4 +38,15 @@ public class UserServiceImpl implements UserService {
     public void insert(User user) {
         userDao.insert(user);
     }
+
+	@Override
+	public User login(String username, String password) {
+	    return ((UserDaoImpl) userDao).getUserByUsernameAndPassword(username, password);
+	}
+
+	@Override
+	public User get(String username) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

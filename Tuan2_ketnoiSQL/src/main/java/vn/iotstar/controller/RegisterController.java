@@ -3,6 +3,8 @@ package vn.iotstar.controller;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
+import vn.iotstar.service.impl.UserServiceImpl;
+
 import java.io.IOException;
 
 @WebServlet(urlPatterns = "/register")
@@ -25,7 +27,7 @@ public class RegisterController extends HttpServlet {
         String fullname = req.getParameter("fullname");
         String phone = req.getParameter("phone");
 
-        UserService service = new UserServiceImpl();
+        UserServiceImpl service = new UserServiceImpl();
         String alertMsg = "";
 
         if (service.checkExistEmail(email)) {
