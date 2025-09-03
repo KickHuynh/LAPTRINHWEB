@@ -44,7 +44,7 @@ public class CategoryDaoImpl implements CategoryDao {
 
 	@Override
 	public CategoryModel findById(int id) {
-		String sql = "Select * from Category where Category=?";
+		String sql = "Select * from Category where categoryid=?";
 		try {
 			conn = new DBConnection().getConnection();
 			ps = conn.prepareStatement(sql);

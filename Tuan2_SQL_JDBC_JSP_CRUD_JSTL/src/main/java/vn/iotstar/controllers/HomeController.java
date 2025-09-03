@@ -5,17 +5,25 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
 
-@WebServlet("/home")
+@SuppressWarnings("serial")
+@WebServlet(urlPatterns = {"/admin/home", "/manager/home", "/home"})
 public class HomeController extends HttpServlet {
-    /**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
 
-	@Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        req.getRequestDispatcher("/views/home.jsp").forward(req, resp);
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+            throws ServletException, IOException {
+
+        String uri = req.getRequestURI();
+
+        if (uri.endsWith("/admin/home")) {
+            req.getRequestDispatcher("/views/admin/home.jsp").forward(req, resp);
+        } else if (uri.endsWith("/manager/home")) {
+            req.getRequestDispatcher("/views/manager/home.jsp").forward(req, resp);
+        } else {
+            req.getRequestDispatcher("/views/home.jsp").forward(req, resp);
+        }
     }
 }
