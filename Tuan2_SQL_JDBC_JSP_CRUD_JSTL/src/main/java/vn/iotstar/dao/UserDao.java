@@ -11,6 +11,9 @@ public interface UserDao {
 
 	// Lay 1 user
 	UserModel findById(int id);
+	
+	UserModel findByUserName(String username);
+
 
 	// Them user (register)
 	void insert(UserModel user);
@@ -24,7 +27,10 @@ public interface UserDao {
 	boolean checkExistPhone(String phone);
 	
 	UserModel getByEmail(String email);
+	
 	boolean updatePassword(UserModel user);
+	
+	
 
 
 }

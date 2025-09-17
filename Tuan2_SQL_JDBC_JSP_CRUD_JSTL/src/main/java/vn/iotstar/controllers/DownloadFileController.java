@@ -13,20 +13,19 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import vn.iotstar.utils.Constant;
 
-@WebServlet(urlPatterns = {"/image"})
+@WebServlet(urlPatterns = { "/image" })
 public class DownloadFileController extends HttpServlet {
 
 	private static final long serialVersionUID = 1;
-	
+
 	@Override
-	protected void doGet(HttpServletRequest req, HttpServletResponse resp)
-	throws ServletException, IOException {
-	String fileName = req.getParameter("fname");
-	File file = new File(Constant.DIR + "/" + fileName);
-	resp.setContentType("image/jpeg");
-	if (file.exists()) {
-	IOUtils.copy(new FileInputStream(file), resp.getOutputStream());
+	protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+		String fileName = req.getParameter("fname");
+		File file = new File(Constant.DIR + "/" + fileName);
+		resp.setContentType("image/jpeg");
+		if (file.exists()) {
+			IOUtils.copy(new FileInputStream(file), resp.getOutputStream());
+		}
 	}
-	}
-	
+
 }

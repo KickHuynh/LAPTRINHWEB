@@ -1,28 +1,31 @@
-<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@taglib prefix="c" uri="jakarta.tags.core"%>
-
-<!DOCTYPE html>
+<%@ taglib uri="jakarta.tags.core" prefix="c" %>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Sửa Category</title>
+    <title>Sửa danh mục</title>
 </head>
 <body>
-    <h2>Sửa Category</h2>
-    <form action="${pageContext.request.contextPath}/admin/category" method="post">
-        <input type="hidden" name="action" value="update"/>
-        <input type="hidden" name="id" value="${cate.categoryid}"/>
+<h2>Sửa danh mục</h2>
+<form action="${pageContext.request.contextPath}/admin/category" method="post" enctype="multipart/form-data">
+    <input type="hidden" name="action" value="update" />
+    <input type="hidden" name="id" value="${cate.categoryid}" />
+    <input type="hidden" name="oldImage" value="${cate.images}" />
 
-        <p>Tên: <input type="text" name="categoryname" value="${cate.categoryname}"/></p>
-        <p>Ảnh: <input type="text" name="images" value="${cate.images}"/></p>
-        <p>Trạng thái:
-            <select name="status">
-                <option value="1" <c:if test="${cate.status == 1}">selected</c:if>>Hiển thị</option>
-                <option value="0" <c:if test="${cate.status == 0}">selected</c:if>>Ẩn</option>
-            </select>
-        </p>
+    <label>Tên danh mục:</label>
+    <input type="text" name="categoryname" value="${cate.categoryname}" required /><br/>
 
-        <button type="submit">Cập nhật</button>
-    </form>
+    <label>Trạng thái:</label>
+    <select name="status">
+        <option value="1" ${cate.status==1 ? 'selected' : ''}>Hiển thị</option>
+        <option value="0" ${cate.status==0 ? 'selected' : ''}>Ẩn</option>
+    </select><br/>
+
+    <label>Ảnh hiện tại:</label><br/>
+    <img src="${pageContext.request.contextPath}/images/uploads/${cate.images}" width="150" height="100"/><br/>
+
+    <label>Chọn ảnh mới:</label>
+    <input type="file" name="images" /><br/>
+
+    <button type="submit">Cập nhật</button>
+</form>
 </body>
 </html>

@@ -5,6 +5,8 @@ import vn.iotstar.models.UserModel;
 public interface UserService {
 	 // Đăng nhập
     UserModel login(String username, String password);
+    
+    UserModel FindByUserName(String username);
 
     // Lấy thông tin user theo username
     UserModel get(String username);

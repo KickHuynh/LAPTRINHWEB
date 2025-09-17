@@ -15,9 +15,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
-@SuppressWarnings("serial")
 @WebServlet(urlPatterns = "/login")
 public class LoginController extends HttpServlet {
+	
+	private static final long serialVersionUID = 1L;
+	// lay toan bo ham trong service
+	//UserService service = new UserService();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
@@ -51,8 +54,13 @@ public class LoginController extends HttpServlet {
         req.setCharacterEncoding("UTF-8");
         resp.setCharacterEncoding("UTF-8");
 
+        //lay tham so tu view
         String username = req.getParameter("username");
         String password = req.getParameter("password");
+        
+        System.out.println("===> Username nhập vào: " + username);
+        System.out.println("===> Password nhập vào: " + password);
+        
         boolean isRememberMe = "on".equals(req.getParameter("remember"));
 
         String alertMsg = "";
@@ -62,6 +70,8 @@ public class LoginController extends HttpServlet {
             req.getRequestDispatcher("/views/login.jsp").forward(req, resp);
             return;
         }
+        
+        //xu ly bai toan
 
         UserService service = new UserServiceImpl();
         UserModel user = service.login(username, password);
@@ -82,5 +92,8 @@ public class LoginController extends HttpServlet {
             req.setAttribute("alert", alertMsg);
             req.getRequestDispatcher("/views/login.jsp").forward(req, resp);
         }
+ 
+
     }
+    
 }

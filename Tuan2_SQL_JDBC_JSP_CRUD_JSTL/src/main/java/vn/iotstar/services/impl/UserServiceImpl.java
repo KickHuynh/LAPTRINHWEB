@@ -8,8 +8,8 @@ import vn.iotstar.services.UserService;
 import java.sql.Date;
 
 public class UserServiceImpl implements UserService {
-
-    private UserDao userDao;
+	
+	UserDao userDao = new UserDaoImpl();
 
     public UserServiceImpl() {
         userDao = new UserDaoImpl();
@@ -18,8 +18,14 @@ public class UserServiceImpl implements UserService {
     // Đăng nhập
     @Override
     public UserModel login(String username, String password) {
-        UserModel user = userDao.get(username);
-        if (user != null && user.getPassWord().equals(password)) {
+        UserModel user = this.FindByUserName(username);
+        if (user != null) {
+            System.out.println("===> User tìm thấy trong DB: " + user.getUserName());
+            System.out.println("===> Password trong DB: " + user.getPassWord());
+        } else {
+            System.out.println("===> Không tìm thấy user: " + username);
+        }
+        if (user != null && password.equals(user.getPassWord())) {
             return user;
         }
         return null;
@@ -87,5 +93,12 @@ public class UserServiceImpl implements UserService {
     public boolean updatePassword(UserModel user) {
         return userDao.updatePassword(user);
     }
+
+	@Override
+	public UserModel FindByUserName(String username) {
+		
+		return userDao.findByUserName(username);
+	}
+	
 
 }

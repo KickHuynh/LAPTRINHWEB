@@ -11,12 +11,9 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-@WebServlet("/load-image")
+@WebServlet("/image")
 public class ImageServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
-
-    // Thay đường dẫn này bằng thư mục chứa ảnh của bạn
-    private static final String IMAGE_DIR = "D:/images/";
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -28,13 +25,16 @@ public class ImageServlet extends HttpServlet {
             return;
         }
 
-        File imageFile = new File(IMAGE_DIR + fileName);
+        // đường dẫn thư mục uploads trong server
+        String uploadPath = getServletContext().getRealPath("") + File.separator + "uploads";
+        File imageFile = new File(uploadPath, fileName);
+
         if (!imageFile.exists()) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND, "Không tìm thấy ảnh");
             return;
         }
 
-        // Xác định kiểu content (chỉ demo jpg/png, có thể mở rộng thêm)
+        // Xác định kiểu content
         if (fileName.toLowerCase().endsWith(".jpg") || fileName.toLowerCase().endsWith(".jpeg")) {
             response.setContentType("image/jpeg");
         } else if (fileName.toLowerCase().endsWith(".png")) {
@@ -43,7 +43,6 @@ public class ImageServlet extends HttpServlet {
             response.setContentType("application/octet-stream");
         }
 
-        // Gửi file ra output
         try (FileInputStream fis = new FileInputStream(imageFile);
              OutputStream os = response.getOutputStream()) {
 
