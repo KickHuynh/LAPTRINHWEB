@@ -1,0 +1,14 @@
+# Maven build folder
+/target/
+
+# Eclipse / STS
+.settings/
+.project
+.classpath
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
