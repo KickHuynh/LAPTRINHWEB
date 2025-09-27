@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Category Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    .error-alert {
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+    .success-alert {
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 15px;
+      display: none;
+    }
+  </style>
+</head>
+<body class="container py-4">
+<h2 class="mb-4">Category Management</h2>
+<a href="/" class="btn btn-secondary mb-3">Back to Users</a>
+
+<!-- Error/Success Messages -->
+<div id="errorAlert" class="error-alert"></div>
+<div id="successAlert" class="success-alert"></div>
+
+<!-- Form Create/Update Category -->
+<div class="mb-4">
+  <form id="categoryForm">
+    <input type="hidden" id="categoryId">
+    <div class="mb-2">
+      <input type="text" id="name" class="form-control" placeholder="Category Name" required>
+    </div>
+    <div class="mb-2">
+      <input type="text" id="images" class="form-control" placeholder="Image URL">
+    </div>
+    <button class="btn btn-primary">Save</button>
+  </form>
+</div>
+
+<table class="table table-bordered">
+  <thead>
+  <tr>
+    <th>ID</th><th>Name</th><th>Image</th><th>Action</th>
+  </tr>
+  </thead>
+  <tbody id="categoryTable"></tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  const GRAPHQL_URL = '/graphql';
+  const userId = new URLSearchParams(window.location.search).get('userId');
+
+  // Helper functions để hiển thị error/success
+  function showError(message) {
+    console.error("ERROR:", message);
+    $('#errorAlert').html(`<strong>Error:</strong> ${message}`).show();
+    $('#successAlert').hide();
+    // Auto hide after 10 seconds
+    setTimeout(() => $('#errorAlert').fadeOut(), 10000);
+  }
+
+  function showSuccess(message) {
+    console.log("SUCCESS:", message);
+    $('#successAlert').html(`<strong>Success:</strong> ${message}`).show();
+    $('#errorAlert').hide();
+    // Auto hide after 5 seconds
+    setTimeout(() => $('#successAlert').fadeOut(), 5000);
+  }
+
+  function hideAlerts() {
+    $('#errorAlert').hide();
+    $('#successAlert').hide();
+  }
+
+  function parseGraphQLError(response) {
+    if (response.errors && response.errors.length > 0) {
+      const error = response.errors[0];
+      console.log("GraphQL Error Details:", error);
+
+      let message = error.message || 'Unknown GraphQL error';
+
+      // Parse specific error types
+      if (message.includes('Products')) {
+        return 'Cannot delete category: This category still has products. Please delete or reassign products first.';
+      } else if (message.includes('Users') || message.includes('assigned')) {
+        return 'Cannot delete category: This category is assigned to users. Please unassign users first.';
+      } else if (message.includes('not found')) {
+        return 'Category not found. It may have been deleted by another user.';
+      } else if (message.includes('Validation failed')) {
+        return 'Validation error: Please check your input data.';
+      }
+
+      return message;
+    }
+    return 'Unknown error occurred';
+  }
+
+  function loadCategories() {
+    hideAlerts();
+
+    $.ajax({
+      url: GRAPHQL_URL,
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        query: '{ categories { id name images } }'
+      }),
+      success: function (data) {
+        console.log("GraphQL loadCategories response:", data);
+
+        // Check for GraphQL errors
+        if (data.errors) {
+          showError("Failed to load categories: " + parseGraphQLError(data));
+          return;
+        }
+
+        if (!data.data || !data.data.categories) {
+          showError("Invalid response format from server");
+          return;
+        }
+
+        const categories = data.data.categories;
+        let rows = '';
+
+        if (categories.length === 0) {
+          rows = '<tr><td colspan="4" class="text-center">No categories found</td></tr>';
+        } else {
+          categories.forEach(c => {
+            const safeId = c.id || 'N/A';
+            const safeName = (c.name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+            const safeImages = (c.images || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
+            rows += `<tr>
+                          <td>${safeId}</td>
+                          <td>${c.name || 'N/A'}</td>
+                          <td><img src="${c.images || '#'}" style="width:50px;height:50px" onerror="this.style.display='none'"></td>
+                          <td>
+                              <button class="btn btn-sm btn-warning" onclick="editCategory(${safeId}, '${safeName}', '${safeImages}')">Edit</button>
+                              <button class="btn btn-sm btn-danger" onclick="deleteCategory(${safeId})">Delete</button>
+                              <a href="/products?categoryId=${safeId}" class="btn btn-sm btn-info">Products</a>
+                          </td>
+                      </tr>`;
+          });
+        }
+
+        $('#categoryTable').html(rows);
+      },
+      error: function (xhr, status, error) {
+        console.error("AJAX loadCategories error:", {
+          xhr: xhr,
+          status: status,
+          error: error,
+          responseText: xhr.responseText
+        });
+
+        let errorMessage = 'Failed to load categories';
+
+        if (xhr.status === 0) {
+          errorMessage += ': Network connection error';
+        } else if (xhr.status === 404) {
+          errorMessage += ': GraphQL endpoint not found (404)';
+        } else if (xhr.status === 500) {
+          errorMessage += ': Server error (500)';
+        } else {
+          errorMessage += `: HTTP ${xhr.status}`;
+        }
+
+        if (xhr.responseText) {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            if (errorData.message) {
+              errorMessage += ` - ${errorData.message}`;
+            }
+          } catch (e) {
+            errorMessage += ` - ${xhr.responseText}`;
+          }
+        }
+
+        showError(errorMessage);
+      }
+    });
+  }
+
+  $('#categoryForm').submit(function (e) {
+    e.preventDefault();
+    hideAlerts();
+
+    const id = $('#categoryId').val();
+    const name = $('#name').val().trim();
+    const images = $('#images').val().trim();
+
+    if (!name) {
+      showError('Category name is required');
+      return;
+    }
+
+    // Escape quotes for GraphQL
+    const safeName = name.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const safeImages = images.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const userIdsStr = userId ? `[${userId}]` : '[]';
+
+    const mutation = id ? `
+            mutation {
+              updateCategory(id: ${id}, input: {
+                name: "${safeName}",
+                images: "${safeImages}",
+                userIds: ${userIdsStr}
+              }) { id name images }
+            }
+        ` : `
+            mutation {
+              createCategory(input: {
+                name: "${safeName}",
+                images: "${safeImages}",
+                userIds: ${userIdsStr}
+              }) { id name images }
+            }
+        `;
+
+    console.log("Sending mutation:", mutation);
+
+    $.ajax({
+      url: GRAPHQL_URL,
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({ query: mutation }),
+      success: function (response) {
+        console.log("Save response:", response);
+
+        if (response.errors) {
+          showError("Failed to save category: " + parseGraphQLError(response));
+          return;
+        }
+
+        showSuccess(id ? 'Category updated successfully!' : 'Category created successfully!');
+        loadCategories();
+        $('#categoryForm')[0].reset();
+        $('#categoryId').val('');
+      },
+      error: function (xhr, status, error) {
+        console.error("AJAX saveCategory error:", {
+          xhr: xhr,
+          status: status,
+          error: error,
+          responseText: xhr.responseText
+        });
+
+        let errorMessage = 'Failed to save category';
+        if (xhr.responseText) {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            if (errorData.message) {
+              errorMessage += `: ${errorData.message}`;
+            }
+          } catch (e) {
+            errorMessage += `: ${xhr.responseText}`;
+          }
+        }
+
+        showError(errorMessage);
+      }
+    });
+  });
+
+  function editCategory(id, name, images) {
+    hideAlerts();
+    $('#categoryId').val(id);
+    $('#name').val(name);
+    $('#images').val(images);
+    showSuccess('Ready to edit category');
+  }
+
+  function deleteCategory(id) {
+    hideAlerts();
+
+    if (!confirm('Are you sure you want to delete this category?')) {
+      return;
+    }
+
+    $.ajax({
+      url: GRAPHQL_URL,
+      method: "POST",
+      contentType: "application/json",
+      data: JSON.stringify({
+        query: `mutation { deleteCategory(id: ${id}) }`
+      }),
+      success: function (response) {
+        console.log("Delete response:", response);
+
+        if (response.errors) {
+          showError("Failed to delete category: " + parseGraphQLError(response));
+          return;
+        }
+
+        showSuccess("Category deleted successfully!");
+        loadCategories();
+      },
+      error: function (xhr, status, error) {
+        console.error("AJAX deleteCategory error:", {
+          xhr: xhr,
+          status: status,
+          error: error,
+          responseText: xhr.responseText
+        });
+
+        let errorMessage = 'Failed to delete category';
+        if (xhr.responseText) {
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            if (errorData.message) {
+              errorMessage += `: ${errorData.message}`;
+            }
+          } catch (e) {
+            errorMessage += `: ${xhr.responseText}`;
+          }
+        }
+
+        showError(errorMessage);
+      }
+    });
+  }
+
+  $(document).ready(function() {
+    console.log("Page loaded, userId:", userId);
+    loadCategories();
+  });
+</script>
+</body>
+</html>

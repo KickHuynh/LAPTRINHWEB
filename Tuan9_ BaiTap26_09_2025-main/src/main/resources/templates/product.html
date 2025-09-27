@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Product Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <style>
+        .error-alert {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success-alert {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body class="container py-4">
+<h2 class="mb-4">Product Management</h2>
+<a href="javascript:history.back()" class="btn btn-secondary mb-3">Back</a>
+
+<!-- Error/Success Messages -->
+<div id="errorAlert" class="error-alert"></div>
+<div id="successAlert" class="success-alert"></div>
+
+<!-- Filter -->
+<div class="row mb-3">
+    <div class="col-md-4">
+        <input type="text" id="searchCategoryId" class="form-control" placeholder="Category ID">
+    </div>
+    <div class="col-md-2">
+        <button class="btn btn-primary w-100" onclick="loadProducts()">Search</button>
+    </div>
+    <div class="col-md-3">
+        <button class="btn btn-success w-100" onclick="loadSortedByPrice()">Sort by Price ASC</button>
+    </div>
+</div>
+
+<!-- Form Create Product -->
+<form id="productForm" class="mb-4">
+    <input type="hidden" id="productId">
+    <div class="row">
+        <div class="col-md-3"><input type="text" id="title" class="form-control" placeholder="Title" required></div>
+        <div class="col-md-2"><input type="number" id="quantity" class="form-control" placeholder="Quantity" required></div>
+        <div class="col-md-3"><input type="text" id="description" class="form-control" placeholder="Description"></div>
+        <div class="col-md-2"><input type="number" step="0.01" id="price" class="form-control" placeholder="Price" required></div>
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100">Save</button>
+        </div>
+    </div>
+</form>
+
+<table class="table table-bordered">
+    <thead>
+    <tr>
+        <th>ID</th><th>Title</th><th>Quantity</th><th>Description</th><th>Price</th><th>Category</th><th>Action</th>
+    </tr>
+    </thead>
+    <tbody id="productTable"></tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    const GRAPHQL_URL = '/graphql';
+    const defaultCategoryId = new URLSearchParams(window.location.search).get('categoryId');
+    if (defaultCategoryId) {
+        $('#searchCategoryId').val(defaultCategoryId);
+    }
+
+    // Helper functions để hiển thị error/success
+    function showError(message) {
+        console.error("ERROR:", message);
+        $('#errorAlert').html(`<strong>Error:</strong> ${message}`).show();
+        $('#successAlert').hide();
+        setTimeout(() => $('#errorAlert').fadeOut(), 10000);
+    }
+
+    function showSuccess(message) {
+        console.log("SUCCESS:", message);
+        $('#successAlert').html(`<strong>Success:</strong> ${message}`).show();
+        $('#errorAlert').hide();
+        setTimeout(() => $('#successAlert').fadeOut(), 5000);
+    }
+
+    function hideAlerts() {
+        $('#errorAlert').hide();
+        $('#successAlert').hide();
+    }
+
+    function parseGraphQLError(response) {
+        if (response.errors && response.errors.length > 0) {
+            const error = response.errors[0];
+            console.log("GraphQL Error Details:", error);
+
+            let message = error.message || 'Unknown GraphQL error';
+
+            if (message.includes('not found')) {
+                return 'Resource not found. It may have been deleted by another user.';
+            } else if (message.includes('Validation')) {
+                return 'Validation error: Please check your input data.';
+            } else if (message.includes('category')) {
+                return 'Category error: Please ensure the category exists and is valid.';
+            }
+
+            return message;
+        }
+        return 'Unknown error occurred';
+    }
+
+    function loadProducts() {
+        hideAlerts();
+        const cateId = $('#searchCategoryId').val().trim();
+
+        // SỬA: Dùng đúng tên parameter theo GraphQL schema
+        if (cateId) {
+            query = `{ productsByCategory(id: ${cateId}) { id title quantity description price category { id name } } }`;
+        } else {
+            query = `{ products { id title quantity description price category { id name } } }`;
+        }
+        console.log("cateId =", cateId);
+        console.log("Generated query =", query);
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query }),
+            success: function (data) {
+                console.log("Load products response:", data);
+
+                if (data.errors) {
+                    showError("Failed to load products: " + parseGraphQLError(data));
+                    return;
+                }
+
+                if (!data.data) {
+                    showError("Invalid response format from server");
+                    return;
+                }
+
+                const products = cateId ? data.data.productsByCategory : data.data.products;
+
+                if (!products) {
+                    showError("No products data received from server");
+                    return;
+                }
+
+                renderTable(products);
+
+                if (products.length === 0) {
+                    showSuccess("No products found for this category");
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX loadProducts error:", {
+                    xhr: xhr,
+                    status: status,
+                    error: error,
+                    responseText: xhr.responseText
+                });
+
+                let errorMessage = 'Failed to load products';
+                if (xhr.status === 400) {
+                    errorMessage += ': Bad Request - Check your query syntax';
+                } else if (xhr.status === 404) {
+                    errorMessage += ': GraphQL endpoint not found';
+                } else if (xhr.status === 500) {
+                    errorMessage += ': Server error';
+                }
+
+                if (xhr.responseText) {
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        if (errorData.message) {
+                            errorMessage += ` - ${errorData.message}`;
+                        }
+                    } catch (e) {
+                        // Ignore JSON parse error
+                    }
+                }
+
+                showError(errorMessage);
+            }
+        });
+    }
+
+    function loadSortedByPrice() {
+        hideAlerts();
+
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({
+                query: '{ allProductsSortedByPriceAsc { id title quantity description price category { id name } } }'
+            }),
+            success: function (data) {
+                console.log("Load sorted products response:", data);
+
+                if (data.errors) {
+                    showError("Failed to load sorted products: " + parseGraphQLError(data));
+                    return;
+                }
+
+                if (!data.data || !data.data.allProductsSortedByPriceAsc) {
+                    showError("Invalid response format from server");
+                    return;
+                }
+
+                renderTable(data.data.allProductsSortedByPriceAsc);
+                showSuccess("Products sorted by price ascending");
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX loadSortedByPrice error:", xhr);
+                showError("Error loading sorted products: " + (xhr.responseText || error));
+            }
+        });
+    }
+
+    function renderTable(products) {
+        let rows = '';
+
+        if (!products || products.length === 0) {
+            rows = '<tr><td colspan="7" class="text-center">No products found</td></tr>';
+        } else {
+            products.forEach(p => {
+                const safeTitle = (p.title || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                const safeDescription = (p.description || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                const categoryName = p.category ? p.category.name : 'N/A';
+
+                rows += `<tr>
+                    <td>${p.id || 'N/A'}</td>
+                    <td>${p.title || 'N/A'}</td>
+                    <td>${p.quantity || 0}</td>
+                    <td>${p.description || ''}</td>
+                    <td>${p.price || 0}</td>
+                    <td>${categoryName}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editProduct(${p.id}, '${safeTitle}', ${p.quantity || 0}, '${safeDescription}', ${p.price || 0})">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">Delete</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        $('#productTable').html(rows);
+    }
+
+    $('#productForm').submit(function (e) {
+        e.preventDefault();
+        hideAlerts();
+
+        const id = $('#productId').val();
+        const title = $('#title').val().trim();
+        const quantity = parseInt($('#quantity').val()) || 0;
+        const description = $('#description').val().trim();
+        const price = parseFloat($('#price').val()) || 0;
+        const cateId = $('#searchCategoryId').val().trim() || defaultCategoryId;
+
+        // Validation
+        if (!title) {
+            showError('Product title is required');
+            return;
+        }
+
+        if (!cateId) {
+            showError('Category ID is required');
+            return;
+        }
+
+        if (quantity < 0) {
+            showError('Quantity must be non-negative');
+            return;
+        }
+
+        if (price < 0) {
+            showError('Price must be non-negative');
+            return;
+        }
+
+        // Escape strings for GraphQL
+        const safeTitle = title.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+        const safeDescription = description.replace(/"/g, '\\"').replace(/\n/g, '\\n');
+
+        const mutation = id ? `
+            mutation {
+              updateProduct(id: ${id}, input: {
+                title: "${safeTitle}",
+                quantity: ${quantity},
+                description: "${safeDescription}",
+                price: ${price}
+              }) { id title quantity description price }
+            }
+        ` : `
+            mutation {
+              createProduct(input: {
+                title: "${safeTitle}",
+                quantity: ${quantity},
+                description: "${safeDescription}",
+                price: ${price},
+                categoryId: ${cateId}
+              }) { id title quantity description price }
+            }
+        `;
+
+        console.log("Sending mutation:", mutation);
+
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query: mutation }),
+            success: function (response) {
+                console.log("Save response:", response);
+
+                if (response.errors) {
+                    showError("Failed to save product: " + parseGraphQLError(response));
+                    return;
+                }
+
+                showSuccess(id ? 'Product updated successfully!' : 'Product created successfully!');
+                loadProducts();
+                $('#productForm')[0].reset();
+                $('#productId').val('');
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX saveProduct error:", xhr);
+
+                let errorMessage = 'Failed to save product';
+                if (xhr.responseText) {
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        if (errorData.message) {
+                            errorMessage += `: ${errorData.message}`;
+                        }
+                    } catch (e) {
+                        errorMessage += `: ${xhr.responseText}`;
+                    }
+                }
+
+                showError(errorMessage);
+            }
+        });
+    });
+
+    function editProduct(id, title, quantity, description, price) {
+        hideAlerts();
+        $('#productId').val(id);
+        $('#title').val(title);
+        $('#quantity').val(quantity);
+        $('#description').val(description);
+        $('#price').val(price);
+        showSuccess('Ready to edit product');
+    }
+
+    function deleteProduct(id) {
+        hideAlerts();
+
+        if (!confirm('Are you sure you want to delete this product?')) {
+            return;
+        }
+
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query: `mutation { deleteProduct(id: ${id}) }` }),
+            success: function (response) {
+                console.log("Delete response:", response);
+
+                if (response.errors) {
+                    showError("Failed to delete product: " + parseGraphQLError(response));
+                    return;
+                }
+
+                showSuccess("Product deleted successfully!");
+                loadProducts();
+            },
+            error: function (xhr, status, error) {
+                console.error("AJAX deleteProduct error:", xhr);
+                showError("Error deleting product: " + (xhr.responseText || error));
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        console.log("Page loaded, defaultCategoryId:", defaultCategoryId);
+        loadProducts();
+    });
+</script>
+</body>
+</html>

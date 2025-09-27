@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>User Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+</head>
+<body class="container py-4">
+<h2 class="mb-4">User Management</h2>
+
+<!-- Form Create User -->
+<div class="mb-4">
+    <h5>Create / Update User</h5>
+    <form id="userForm">
+        <input type="hidden" id="userId">
+        <div class="mb-2">
+            <input type="text" id="fullname" class="form-control" placeholder="Full Name" required>
+        </div>
+        <div class="mb-2">
+            <input type="email" id="email" class="form-control" placeholder="Email" required>
+        </div>
+        <div class="mb-2">
+            <input type="text" id="phone" class="form-control" placeholder="Phone">
+        </div>
+        <div class="mb-2">
+            <input type="password" id="password" class="form-control" placeholder="Password" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+</div>
+
+<!-- Table User -->
+<table class="table table-bordered">
+    <thead>
+    <tr>
+        <th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Action</th>
+    </tr>
+    </thead>
+    <tbody id="userTable"></tbody>
+</table>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    const GRAPHQL_URL = '/graphql';
+
+    /** Load tất cả user */
+    function loadUsers() {
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query: '{ users { id fullname email phone } }' }),
+            success: function (data) {
+                const users = data.data.users;
+                let rows = '';
+                users.forEach(u => {
+                    rows += `<tr>
+                        <td>${u.id}</td>
+                        <td>${u.fullname}</td>
+                        <td>${u.email}</td>
+                        <td>${u.phone || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="editUser(${u.id}, '${u.fullname}', '${u.email}', '${u.phone || ''}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Delete</button>
+                            <a href="/categories?userId=${u.id}" class="btn btn-sm btn-info">Categories</a>
+                        </td>
+                    </tr>`;
+                });
+                $('#userTable').html(rows);
+            },
+            error: function (xhr) {
+                console.error("GraphQL loadUsers error:", xhr.responseText);
+                alert("Error loading users: " + xhr.responseText);
+            }
+        });
+    }
+
+    /** Submit form create/update */
+    $('#userForm').submit(function (e) {
+        e.preventDefault();
+        const id = $('#userId').val();
+        const mutation = id ? `
+            mutation {
+              updateUser(id: ${id}, input: {
+                fullname: "${$('#fullname').val()}",
+                email: "${$('#email').val()}",
+                password: "${$('#password').val()}",
+                phone: "${$('#phone').val()}"
+              }) { id }
+            }
+        ` : `
+            mutation {
+              createUser(input: {
+                fullname: "${$('#fullname').val()}",
+                email: "${$('#email').val()}",
+                password: "${$('#password').val()}",
+                phone: "${$('#phone').val()}"
+              }) { id }
+            }
+        `;
+
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query: mutation }),
+            success: function () {
+                loadUsers();
+                $('#userForm')[0].reset();
+            },
+            error: function (xhr) {
+                console.error("GraphQL saveUser error:", xhr.responseText);
+                alert("Error saving user: " + xhr.responseText);
+            }
+        });
+    });
+
+    function editUser(id, fullname, email, phone) {
+        $('#userId').val(id);
+        $('#fullname').val(fullname);
+        $('#email').val(email);
+        $('#phone').val(phone);
+    }
+
+    function deleteUser(id) {
+        $.ajax({
+            url: GRAPHQL_URL,
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ query: `mutation { deleteUser(id: ${id}) }` }),
+            success: function () {
+                loadUsers();
+            },
+            error: function (xhr) {
+                console.error("GraphQL deleteUser error:", xhr.responseText);
+                alert("Error deleting user: " + xhr.responseText);
+            }
+        });
+    }
+
+    $(document).ready(loadUsers);
+</script>
+</body>
+</html>
